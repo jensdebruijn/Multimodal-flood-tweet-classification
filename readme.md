@@ -10,7 +10,7 @@ While text classification can classify tweets, assessing whether a tweet is rela
     - Install PostgreSQL (tested with 10.1) and `POSTGRESQL_HOST`, `POSTGRESQL_PORT`, `POSTGRESQL_USER` and `POSTGRESQL_PASSWORD` in *config.py*.
 2. Hydrological input data
     - Register at https://sharaku.eorc.jaxa.jp/GSMaP/registration.html and obtain username and password for ftp-server.
-    - Fill out `USERNAME` and `PASSWORD` in *1. download_GSMaP_hourly.py*
+    - Fill out `GSMaP_USERNAME` and `GSMaP_PASSWORD` in *config.py*
     - Run *1. download_GSMaP_hourly.py*. This file will download hourly GSMaP data to the folder *classification/data/GSMaP/raw*. This will take a while.
     - Run *2. process_rainfall.py*. This will compile a NetCDF4-file out of the downloaded files.
     - Download the HydroBasins dataset for all contintents from https://www.hydrosheds.org/downloads. Select "Standard (Without lakes)" level 9.
