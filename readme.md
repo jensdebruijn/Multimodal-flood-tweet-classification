@@ -14,10 +14,10 @@ While text classification can classify tweets, assessing whether a tweet is rela
     - Run *1. download_GSMaP_hourly.py*. This file will download hourly GSMaP data to the folder *classification/data/GSMaP/raw*. This will take a while.
     - Run *2. process_rainfall.py*. This will compile a NetCDF4-file out of the downloaded files.
     - Download the HydroBasins dataset for all contintents from https://www.hydrosheds.org/downloads. Select "Standard (Without lakes)" level 9.
-    - Unpack the HydroBasins dataset  to data/hybas (e.g., *data/hybas/hybas_af_lev09_v1c.shp*)
+    - Unpack the HydroBasins dataset  to *data/hybas* (e.g., *data/hybas/hybas_af_lev09_v1c.shp*)
     - Download hydrosheds_connectivity.zip from https://doi.org/10.5281/zenodo.1015799
-    - Unpack the data to data/hydrorivers (e.g., *data/hydrorivers/afriv/rapid_connect_HSmsp_tst.csv*)
-    - Download riverPolylines.zip from https://doi.org/10.5281/zenodo.1015799
+    - Unpack the data to *data/hydrorivers* (e.g., *data/hydrorivers/afriv/rapid_connect_HSmsp_tst.csv*)
+    - Download *riverPolylines.zip* from https://doi.org/10.5281/zenodo.1015799
     - Unpack the data to the corresponding folders in data/hydrorivers (e.g., *data/hydrorivers/afriv/afriv.shp*)
     - Run *3. create_river_and_basin_maps.py*
     - Run *4. find_basin_indices.py*
