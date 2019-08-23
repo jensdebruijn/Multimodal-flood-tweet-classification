@@ -4,7 +4,6 @@ import gzip
 import shutil
 
 from config import SAMPLE_SETS as LANGUAGES
-LANGUAGES = ['en', 'id']
 
 data_folder = os.path.join('MUSE', 'data')
 try:
@@ -80,10 +79,6 @@ for language in LANGUAGES:
             cmd = f'python MUSE/supervised.py --src_lang {language} --tgt_lang en --src_emb MUSE/data/wiki.{language}.vec --tgt_emb MUSE/data/wiki.en.vec --n_refinement 5 --dico_train default --cuda false --exp_name classification --exp_id {language} --export "" --n_refinement 5'
             print(cmd)
             subprocess.call(cmd, shell=True)
-            try:
-                os.makedirs(os.path.join(fastText_folder, language))
-            except OSError:
-                pass
             os.rename(
                 os.path.join(dumped_dir, language, 'best_mapping.pth'),
                 os.path.join(fastText_folder, f'best_mapping.{language}.pth')
