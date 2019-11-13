@@ -327,7 +327,9 @@ class DataCreator:
                     text = text.replace(toponym, location_replacements['other'])
         return text
 
-    def get_hydrology(self, doc_date, basin_hydrology):
+    def get_hydrology(self, doc_date, basin_hydrology, dummy=False):
+        if dummy:
+            return [0.5] * 10, ['dummy'] * 10
         hydrology = []
         hydrology_labels = []
         for area_considered in ('local', 'local+upstream'):
@@ -374,7 +376,7 @@ class DataCreator:
         text = self.clean_text(ID, text, language_code, locations)
 
         if context_function:
-            context, context_labels = context_function(date, context_data)
+            context, context_labels = context_function(date, context_data, dummy=False)
             return text, context, context_labels
         else:
             return text
@@ -388,7 +390,7 @@ class DataCreator:
         precipitation = ds.sel(time=slice(start_date, end_date))
         return precipitation
         
-    def process(self, data, res_file, include_labels=False, include_context=False, summarize=False):
+    def process(self, data, res_file, include_labels=False, include_context=False, summarize=False, overwrite=False):
         res_folder = os.path.join('data', 'input')
         try:
             os.makedirs(res_folder)
@@ -396,12 +398,13 @@ class DataCreator:
             pass
         res_file = os.path.join(res_folder, res_file)
         pickle_file = res_file + '.pickle'
-        if os.path.exists(pickle_file):
+        if not overwrite and os.path.exists(pickle_file):
             print(pickle_file, "already exists")
             return None
         
         ids = defaultdict(list)
         texts = defaultdict(list)
+        event_ids = defaultdict(list)
         if include_labels:
             labels = defaultdict(list)
         
@@ -416,7 +419,7 @@ class DataCreator:
                 tweets_by_basin = defaultdict(list)
                 for subbasin, *tweet_info in data:
                     assert subbasin.startswith('s-')  # check if indeed subbasin
-                    assert len(tweet_info) == 6
+                    assert len(tweet_info) == 7
                     tweets_by_basin[subbasin].append(tweet_info)
 
                 rainfall_data = self.load_rainfall_data(
@@ -435,12 +438,13 @@ class DataCreator:
                         correct_rainfall=self.settings['correct_rainfall'],
                         discard_below_or_equal_to_value=self.settings['discard_below_or_equal_to_value']
                     )
+
                     basin_hydrology.set_basin_hydrology()
                     basin_hydrology.set_upstream_basins_hydrology(24)
                     basin_hydrology.set_upstream_basins_hydrology(5 * 24)
 
                     n_tweets = len(tweets)
-                    for i, (ID, date, text, language_code, locations, label) in enumerate(tweets, start=1):
+                    for i, (ID, date, text, language_code, locations, label, event_id) in enumerate(tweets, start=1):
                         print(f'{i}/{n_tweets}', end='\r')
                         text, tweet_context, context_labels = self.get_doc_data(ID, date, text, language_code, locations=locations, context_data=basin_hydrology, context_function=self.get_hydrology)
 
@@ -448,12 +452,14 @@ class DataCreator:
                         ids[language_code].append(ID)
                         texts[language_code].append(text)
                         context[language_code].append(tweet_context)
+                        event_ids[language_code].append(event_id)
                         if include_labels:
                             labels[language_code].append(label)
 
                         # Some summarization to calculate rainfall statistics
                         if include_labels:
                             context_per_class[label].append(tweet_context)
+
             else:                    
                 raise NotImplementedError
             # Summarize
@@ -469,11 +475,12 @@ class DataCreator:
                 summary.to_excel(res_file + '.xlsx')
                 print(summary)
         else:
-            for ID, date, text, language_code, label in data:
+            for ID, date, text, language_code, label, event_id in data:
                 text = self.get_doc_data(ID, date, text, language_code)
                 # fill arrays for sample (text, rainfall, labels)
                 ids[language_code].append(ID)
                 texts[language_code].append(text)
+                event_ids[language_code].append(event_id)
                 if include_labels:
                     labels[language_code].append(label)
 
@@ -483,6 +490,7 @@ class DataCreator:
         all_ids = []
         all_languages = []
         all_sentences = []
+        all_event_ids = []
         if include_labels:
             all_labels = []
         embedding_matrices = []
@@ -513,7 +521,8 @@ class DataCreator:
 
             text_sequences = tf.keras.preprocessing.sequence.pad_sequences(text_sequences, maxlen=SEQUENCE_LENGTH)
             all_text_sequences.extend(text_sequences)    
-            all_ids.extend(ids[language_code] )     
+            all_ids.extend(ids[language_code])
+            all_event_ids.extend(event_ids[language_code])     
             
             if include_context:
                 context_lang = np.array(context[language_code], dtype=np.float32)
@@ -534,6 +543,7 @@ class DataCreator:
 
         data = {
             'ids': all_ids,
+            'event_ids': all_event_ids,
             'sentences': all_sentences,
             'text_sequences': np.array(all_text_sequences, dtype=np.int32),
             'languages': all_languages
@@ -554,7 +564,7 @@ class DataCreator:
         with open(pickle_file, 'wb') as p:
             pickle.dump(res, p)
 
-    def analyze_labelled_data(self):
+    def analyze_labelled_data(self, overwrite=False):
         labeled_data = pd.read_csv('data/labeled_data_hydrated.csv')
         for sample_set in SAMPLE_SETS:
             tweets = []
@@ -566,11 +576,12 @@ class DataCreator:
                     tweet['text'],
                     tweet['language'],
                     tweet['locations'],
-                    tweet['label']
+                    tweet['label'],
+                    tweet['event_id']
                 ))
             if tweets:
                 res_file = f"data_{sample_set}_correct_rainfall_{self.settings['correct_rainfall']}_discard_below_or_equal_to_value_{self.settings['discard_below_or_equal_to_value']}_{self.settings['rainfall_dataset']}"
-                self.process(tweets, res_file=res_file, include_labels=True, include_context='hydrology')
+                self.process(tweets, res_file=res_file, include_labels=True, include_context='hydrology', overwrite=overwrite)
 
     def analyze_tweets_subbasin(self, subbasin, languages=None):
         from db.elastic import Elastic
@@ -623,4 +634,4 @@ if __name__ == '__main__':
         "replace_locations": True
     }
     data_creator = DataCreator(settings)
-    data_creator.analyze_labelled_data()
+    data_creator.analyze_labelled_data(overwrite=False)
