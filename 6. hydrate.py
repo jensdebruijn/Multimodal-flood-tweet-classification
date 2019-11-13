@@ -64,10 +64,12 @@ def lookup(tweet_ids):
             languages.append(language)
     return texts, dates, languages
 
-df = pd.read_csv('data/labeled_data.csv')
-texts, dates, languages = lookup(df['ID'])
-df['text'] = texts
-df['date'] = dates
-df['language'] = languages
 
-df.to_csv('data/labeled_data_hydrated.csv')
+if __name__ == "__main__":
+    df = pd.read_csv('data/labeled_data.csv')
+    texts, dates, languages = lookup(df['ID'])
+    df['text'] = texts
+    df['date'] = dates
+    df['language'] = languages
+
+    df.to_csv('data/labeled_data_hydrated.csv')
