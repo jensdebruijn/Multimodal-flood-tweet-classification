@@ -24,7 +24,7 @@ def create_run_name(experiment, iterations):
     run_name += str(iterations)
     return run_name
 
-def main(experiment_type):
+def main(experiment_type, iterations, n_folds, verbose=False):
     hyper_parameters = {
         'n_epochs': [300],
         'discard_below_or_equal_to_value': [0],  # Discard zeros works better than not discard. Test with discard lower than x..
@@ -32,17 +32,6 @@ def main(experiment_type):
     }
 
     assert experiment_type in ('learning_rate', 'base_test', 'compare_pos_weight', 'compare_rainfall', 'export_normal', 'batch_size') or experiment_type.startswith('exclude-') or experiment_type.startswith('evaluate-')
-
-    VERBOSE = False 
-
-    if experiment_type in ('compare_pos_weight', 'compare_rainfall', 'learning_rate', 'batch_size', 'export_normal'):
-        ITERATIONS = 10
-        N_FOLDS = 5
-    elif experiment_type.startswith('evaluate-') or experiment_type.startswith('exclude-'):
-        ITERATIONS = 10
-        N_FOLDS = 5
-    else:
-        raise ValueError(f'iterations and n_folds not defined for {experiment_type}')
 
     if experiment_type == 'compare_pos_weight':
         POS_WEIGHTS = [0.50, 1.00, 2.00, 3.00, 5.00]
@@ -115,10 +104,10 @@ def main(experiment_type):
             includes_context=True,
             includes_labels=True
         )
-        data_loader.set_data(split=settings['split'], n_folds=N_FOLDS, iterations=ITERATIONS)
+        all_data = data_loader.get_data(split=settings['split'], n_folds=n_folds, iterations=iterations)
 
         experiment_iteration = 0
-        for percent_positive_validation, run_data, iteration_n, fold_n in data_loader.data:
+        for percent_positive_validation, run_data, iteration_n, fold_n in all_data:
             experiment_iteration += 1
             for test_model in (False, ):
                 for pos_weight in POS_WEIGHTS:
@@ -136,7 +125,7 @@ def main(experiment_type):
                             run_data_sel,
                             run_name=run_name,
                             log=False,
-                            verbose=VERBOSE,
+                            verbose=verbose,
                             pos_weight=pos_weight,
                             n_epochs=settings['n_epochs'],
                             learning_rate=settings['learning_rate'],
@@ -147,7 +136,7 @@ def main(experiment_type):
                             save_model_path=save_model_path
                         )
                         output_df = output_df.append(pd.Series(
-                                [iteration_n, fold_n, N_FOLDS, percent_positive_validation, test_model, use_hydrology, pos_weight] + \
+                                [iteration_n, fold_n, n_folds, percent_positive_validation, test_model, use_hydrology, pos_weight] + \
                                 list(settings.values()) + \
                                 [
                                     best_val_score.loc['precision', 'flood'],
@@ -175,4 +164,4 @@ def main(experiment_type):
 
 if __name__ == '__main__':
     EXPERIMENT_TYPE = 'base_test'
-    main(EXPERIMENT_TYPE)
+    main(EXPERIMENT_TYPE, 1, 5)
