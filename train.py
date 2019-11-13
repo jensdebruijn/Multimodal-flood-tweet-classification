@@ -22,7 +22,7 @@ np.set_printoptions(suppress=True)
 PATIENCE = None
 
 def train(
-    data,
+    run_data,
     run_name,
     pos_weight=1,
     n_epochs=100,
@@ -40,9 +40,9 @@ def train(
         assert context_labels
 
     if use_context:
-        x_train_id, x_val_id, y_train, y_val, x_train_text, x_val_text, x_train_context, x_val_context = data
+        x_train_id, x_val_id, y_train, y_val, x_train_text, x_val_text, x_train_context, x_val_context = run_data
     else:
-        x_train_id, x_val_id, y_train, y_val, x_train_text, x_val_text = data
+        x_train_id, x_val_id, y_train, y_val, x_train_text, x_val_text = run_data
 
     tf.reset_default_graph()
 
