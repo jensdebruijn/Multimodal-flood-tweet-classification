@@ -15,5 +15,4 @@ TWITTER_CONSUMER_SECRET = ''
 TWITTER_ACCESS_TOKEN = ''
 TWITTER_ACCESS_TOKEN_SECRET = ''
 
-import os
-SAVE_DIR = os.path.join('classification', 'model_exports')
+EXPORT_DIR = 'model_exports'
