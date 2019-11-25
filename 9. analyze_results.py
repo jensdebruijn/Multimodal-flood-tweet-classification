@@ -81,7 +81,7 @@ def corrected_dependent_ttest(data1, data2, n_training_folds, n_test_folds):
     return t_stat, df, p
 
 
-def get_significance(population1, population2,  n_training_folds, n_test_folds, thresholds=(0.01, 0.05, 0.10)):
+def get_significance(population1, population2,  n_training_folds, n_test_folds, thresholds=(0.01, 0.05)):
     _, _, p = corrected_dependent_ttest(population1, population2, n_training_folds, n_test_folds)
     for n, threshold in enumerate(thresholds):
         if p < threshold:
@@ -89,7 +89,7 @@ def get_significance(population1, population2,  n_training_folds, n_test_folds, 
             return n_asterix * '*'
     return ''
 
-def main(experiment, plot_variable):
+def main(experiment, plot_variable, decimals=2):
 
     if experiment in ('exclude', 'evaluate'):
         dfs = [
@@ -171,20 +171,20 @@ def main(experiment, plot_variable):
             positive = all_scores[score_type][True][plot_value]
             negative = all_scores[score_type][False][plot_value]
             significance = get_significance(positive, negative, n_training_folds, n_validation_folds)
-            df.set_value(plot_value, score_type + '_pos',  "%.2f" % round(np.mean(positive), 2) + significance)
-            df.set_value(plot_value, score_type + '_neg',  "%.2f" % round(np.mean(negative), 2) + significance)
+            df.set_value(plot_value, score_type + '_pos',  round(np.mean(positive), decimals) + significance)
+            df.set_value(plot_value, score_type + '_neg',  round(np.mean(negative), decimals) + significance)
             if score_type == 'f-score':
                 difference = np.mean(positive) -  np.mean(negative)
                 differences.append(difference)
-                df.set_value(plot_value, 'f1-score difference',  "%.4f" % round(difference, 4))
+                df.set_value(plot_value, 'f1-score difference',  round(difference, decimals))
 
     for plot_value in plot_values:
-        percent_positive_validation = round(np.mean(all_scores['% pos val'][True][plot_value]), 2)
+        percent_positive_validation = round(np.mean(all_scores['% pos val'][True][plot_value]), decimals)
         df.set_value(plot_value, '% pos val', percent_positive_validation)
 
     print(df)
     print('average difference:', np.mean(differences))
-    df.to_excel(f'results/{experiment}.xlsx')
+    df.to_excel(f'results/evaluated_{experiment}.xlsx')
 
     ax.set_ylim([0, 1.02])
     ax.set_xlim([plot_values[0], plot_values[-1]])
@@ -200,4 +200,4 @@ if __name__ == '__main__':
         ('evaluate', 'split'),
         ('exclude', 'split'),
     ):
-        main(experiment, plot_variable)
+        main(experiment, plot_variable, decimals=4)
