@@ -5,6 +5,7 @@ ITERATIONS = 10
 N_FOLDS = 5
 
 experiments = [
+    'export_normal',
     'compare_pos_weight',
 ]
 
