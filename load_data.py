@@ -8,9 +8,10 @@ import random
 
 
 class DataLoader:
-    def __init__(self, fps, embedded_text=True, includes_context=False, includes_labels=False):
+    def __init__(self, fps, embedded_text=True, includes_context=False, includes_groups=False, includes_labels=False):
         self.includes_context = includes_context
         self.includes_labels = includes_labels
+        self.includes_groups = includes_groups
         self.load(fps, embedded_text)
 
     def __len__(self):
@@ -30,7 +31,8 @@ class DataLoader:
             all_context = []
         if self.includes_labels:
             all_labels = []
-        all_event_ids = []
+        if self.includes_groups:
+            all_group_ids = []
         for fp in fps:
             with open(fp, 'rb') as p:
                 res = pickle.load(p)
@@ -38,7 +40,8 @@ class DataLoader:
             ids = data['ids']
             all_languages.extend(data['languages'])
             all_ids.extend(ids)
-            all_event_ids.extend(data['event_ids'])
+            if self.includes_groups:
+                all_group_ids.extend(data['event_ids'])
             if embedded_text:
                 embedded_sequences = self.lookup_word_embeddings(
                     data['text_sequences'],
@@ -67,7 +70,10 @@ class DataLoader:
         self.languages = np.array(all_languages)
         self.x_text = np.array(all_text)
         self.ids = np.array(all_ids)
-        self.event_ids = np.array(all_event_ids)
+        if self.includes_groups:
+            self.group_ids = np.array(all_group_ids)
+        else:
+            self.group_ids = np.arange(0, self.ids.size, 1)
 
 
     def stratified_group_k_fold(self, y, groups, k, seed=None):
@@ -115,9 +121,9 @@ class DataLoader:
             yield train_indices, test_indices
 
 
-    def kfold(self, n_folds, ids, event_ids, y, x_text, x_context=None, statified=False):
+    def kfold(self, n_folds, ids, group_ids, y, x_text, x_context=None, statified=False):
         all_data = []
-        folds = self.stratified_group_k_fold(y=y, groups=event_ids, k=n_folds)
+        folds = self.stratified_group_k_fold(y=y, groups=group_ids, k=n_folds)
         for train_index, test_index in folds:  # x 
             data = [
                     ids[train_index],
@@ -144,13 +150,13 @@ class DataLoader:
         tf.reset_default_graph()
         return text_sequences
 
-    def k_fold_single_set(self, n_folds, ids, event_ids, y, x_text, x_context):
+    def k_fold_single_set(self, n_folds, ids, group_ids, y, x_text, x_context):
         output = []
-        folds = self.stratified_group_k_fold(y=y, groups=event_ids, k=n_folds)
+        folds = self.stratified_group_k_fold(y=y, groups=group_ids, k=n_folds)
         for index, _ in folds:
             output.append([
                 ids[index],
-                event_ids[index],
+                group_ids[index],
                 y[index],
                 x_text[index],
                 x_context[index]
@@ -162,24 +168,24 @@ class DataLoader:
         for iteration_n in range(iterations):
             if split == 'random':
                 if self.includes_context:
-                    all_data = self.kfold(n_folds, self.ids, self.event_ids, self.y, self.x_text, x_context=self.x_context)
+                    all_data = self.kfold(n_folds, self.ids, self.group_ids, self.y, self.x_text, x_context=self.x_context)
                 else:
-                    all_data = self.kfold(n_folds, self.ids, self.event_ids, self.y, self.x_text)
+                    all_data = self.kfold(n_folds, self.ids, self.group_ids, self.y, self.x_text)
 
             elif split.startswith('only-'):
                 language = split[len('only-'):]
                 lang_set = np.where(self.languages == language)
                 if self.includes_context:
-                    all_data = self.kfold(n_folds, self.ids[lang_set], self.event_ids[lang_set], self.y[lang_set], self.x_text[lang_set], x_context=self.x_context[lang_set])
+                    all_data = self.kfold(n_folds, self.ids[lang_set], self.group_ids[lang_set], self.y[lang_set], self.x_text[lang_set], x_context=self.x_context[lang_set])
                 else:
-                    all_data = self.kfold(n_folds, self.ids[lang_set], self.event_ids[lang_set],self.y[lang_set], self.x_text[lang_set])
+                    all_data = self.kfold(n_folds, self.ids[lang_set], self.group_ids[lang_set],self.y[lang_set], self.x_text[lang_set])
                     
             elif split.startswith('exclude-'):
                 if self.includes_context:
                     language = split[len('exclude-'):]
                     train_set = np.where(self.languages != language)
                     val_set = np.where(self.languages == language)
-                    train_data = self.k_fold_single_set(n_folds, self.ids[train_set], self.event_ids[train_set], self.y[train_set], self.x_text[train_set], self.x_context[train_set])
+                    train_data = self.k_fold_single_set(n_folds, self.ids[train_set], self.group_ids[train_set], self.y[train_set], self.x_text[train_set], self.x_context[train_set])
                     all_data = []
                     for train in train_data:
                         all_data.append([
@@ -198,26 +204,26 @@ class DataLoader:
 
                     training_sample_lang, (
                         validation_sample_ids,
-                        validation_sample_event_ids,
+                        validation_sample_group_ids,
                         validation_sample_y,
                         validation_sample_x_text,
                         validation_sample_x_context
                     ) = self.k_fold_single_set(
                         2,
                         self.ids[languages_evaluated],
-                        self.event_ids[languages_evaluated],
+                        self.group_ids[languages_evaluated],
                         self.y[languages_evaluated],
                         self.x_text[languages_evaluated],
                         self.x_context[languages_evaluated],
                     )
 
                     training_sample_ids = np.concatenate([self.ids[languages_not_evaluated], training_sample_lang[0]], axis=0)
-                    training_sample_event_ids = np.concatenate([self.event_ids[languages_not_evaluated], training_sample_lang[1]], axis=0)
+                    training_sample_group_ids = np.concatenate([self.group_ids[languages_not_evaluated], training_sample_lang[1]], axis=0)
                     training_sample_y = np.concatenate([self.y[languages_not_evaluated], training_sample_lang[2]], axis=0)
                     training_sample_x_text = np.concatenate([self.x_text[languages_not_evaluated], training_sample_lang[3]], axis=0)
                     training_sample_x_context = np.concatenate([self.x_context[languages_not_evaluated], training_sample_lang[4]], axis=0)
 
-                    train_data = self.k_fold_single_set(n_folds, training_sample_ids, training_sample_event_ids, training_sample_y, training_sample_x_text, training_sample_x_context)
+                    train_data = self.k_fold_single_set(n_folds, training_sample_ids, training_sample_group_ids, training_sample_y, training_sample_x_text, training_sample_x_context)
                     all_data = []
                     for train in train_data:
                         all_data.append([
@@ -266,10 +272,10 @@ if __name__ == '__main__':
         )
 
         df = pd.read_csv('data/labeled_data_hydrated.csv')
-        event_ids = df.set_index('ID')['event_id'].to_dict()
-        event_ids = {
+        group_ids = df.set_index('ID')['event_id'].to_dict()
+        group_ids = {
             't-' + str(ID): event_id
-            for ID, event_id in event_ids.items()
+            for ID, event_id in group_ids.items()
         }
 
         data_loader.set_data(split=settings['split'], n_folds=5, iterations=10)
@@ -279,7 +285,7 @@ if __name__ == '__main__':
             print(y_train.sum() / y_train.size)
             print(y_val.sum() / y_val.size)
 
-            train_event_ids = set([event_ids[ID] for ID in x_train_id])
-            val_event_ids = set([event_ids[ID] for ID in x_val_id])
+            train_group_ids = set([group_ids[ID] for ID in x_train_id])
+            val_group_ids = set([group_ids[ID] for ID in x_val_id])
 
-            assert not train_event_ids & val_event_ids
+            assert not train_group_ids & val_group_ids
