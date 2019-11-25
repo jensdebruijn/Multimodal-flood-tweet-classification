@@ -1,11 +1,16 @@
 ## CUSTOM
-
 data/fastText
 data/GSMaP
 data/input
 data/labeled_data_hydrated.csv
+model_exports/
 results/
+tmp/
 
+create_input_data.py
+load_data.py
+score_map.py
+timeline.py
 
 ## PYTHON STUFF
 
