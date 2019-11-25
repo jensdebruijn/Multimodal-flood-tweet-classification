@@ -1,10 +1,11 @@
 import numpy as np
 import os
 import tensorflow as tf
+import pandas as pd
 
 from model import model
 from config import (
-    SAVE_DIR,
+    EXPORT_DIR,
     SEQUENCE_LENGTH,
     EMBEDDING_DIM,
 )
@@ -21,6 +22,34 @@ np.set_printoptions(suppress=True)
 
 PATIENCE = None
 
+
+def export_labels_f(
+    batch_ids_val,
+    predictions_batches_val,
+    actual_batches_val,
+    run_name,
+):
+    data = []
+    for ID, prediction, actual in zip(batch_ids_val, predictions_batches_val, actual_batches_val):
+        row = (ID, actual, prediction)
+        data.append(row)
+
+    df = pd.DataFrame(data, columns=['ID', 'actual', 'prediction'])
+    folder = os.path.join(EXPORT_DIR, 'labels')
+    try:
+        os.makedirs(folder)
+    except OSError:
+        pass
+    fn = os.path.join(folder, f'{run_name}.xlsx')
+    while True:
+        try:
+            df.to_excel(fn, index=False)
+            break
+        except PermissionError:
+            print()
+            input(f"Please close {fn} and press ENTER")
+
+
 def train(
     run_data,
     run_name,
@@ -34,7 +63,8 @@ def train(
     save_model_path=True,
     verbose=False,
     log=True,
-    return_restore_dir=False
+    return_restore_dir=False,
+    export_labels=False
 ):
     if use_context:
         assert context_labels
@@ -68,7 +98,7 @@ def train(
 
     with tf.Session() as sess:        
         if log:
-            log_folder = 'classification/logs'
+            log_folder = 'logs'
             logger = Logger(
                 get_run_log_folder(run_name, log_folder),
                 sess.graph
@@ -164,7 +194,6 @@ def train(
             actual_batches_val = []
             predictions_batches_val = []
             batch_ids_val = []
-            batch_context_val = []
             for val_batch in val_batches:
                 batch_actual, batch_predictions, batch_id, batch_loss, batch_loss_all = do_step(
                     loss,
@@ -188,8 +217,7 @@ def train(
                 
                 actual_batches_val.extend(batch_actual)
                 predictions_batches_val.extend(batch_predictions)
-                batch_ids_val.extend(val_batch[:,2])
-                batch_context_val.extend(val_batch[:,1])
+                batch_ids_val.extend(batch_id)
 
             val_scores = calculate_scores(
                 actual_batches_val,
@@ -214,6 +242,8 @@ def train(
 
             if best_model_idx + 1 == global_epoch:
                 best_model_val_score = val_scores
+                if export_labels:
+                    best_model_export_for_error_label = batch_ids_val, predictions_batches_val, actual_batches_val
                 best_val_loss = avg_val_loss
 
                 if save_model_path:
@@ -228,7 +258,13 @@ def train(
                 print()
         
         best_model_epoch = best_model_idx + 1
-        restore_dir = os.path.join(SAVE_DIR, f'{best_model_epoch}.ckpt')
+
+        if export_labels:
+            assert len(best_model_export_for_error_label) == 3
+            export_labels_f(
+                *best_model_export_for_error_label,
+                run_name,
+            )
 
         if verbose:
             print()
@@ -236,6 +272,7 @@ def train(
             print(best_model_val_score)
 
         if return_restore_dir:
+            restore_dir = os.path.join(EXPORT_DIR, f'{best_model_epoch}.ckpt')
             return best_model_val_score, best_val_loss, restore_dir
         else:
             return best_model_val_score, best_val_loss
