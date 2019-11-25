@@ -10,7 +10,7 @@ import tensorflow as tf
 
 from load_data import DataLoader
 from train import train
-from config import SAVE_DIR, SAMPLE_SETS
+from config import EXPORT_DIR, SAMPLE_SETS
 
 # Do not display info messages for Tensorflow
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -64,8 +64,15 @@ def main(experiment_type, iterations, n_folds, verbose=False):
           
     if experiment_type == 'export_normal':
         save_model = True
+        export_labels = True
+        model_export_dir = os.path.join(EXPORT_DIR, 'models')
+        try:
+            os.makedirs(model_export_dir)
+        except OSError:
+            pass
     else:
         save_model = False
+        export_labels = False
 
     # assert all hyperparmaters are in list for
     assert all(isinstance(value, list) for value in hyper_parameters.values())
@@ -102,7 +109,8 @@ def main(experiment_type, iterations, n_folds, verbose=False):
         data_loader = DataLoader(
             fps,
             includes_context=True,
-            includes_labels=True
+            includes_labels=True,
+            includes_groups=True
         )
         all_data = data_loader.get_data(split=settings['split'], n_folds=n_folds, iterations=iterations)
 
@@ -114,7 +122,7 @@ def main(experiment_type, iterations, n_folds, verbose=False):
                     for use_hydrology in (True, False):
                         run_name = f'{pos_weight}_{use_hydrology}_{test_model}_{iteration_n}_{fold_n}'
                         if save_model:
-                            save_model_path = os.path.join(SAVE_DIR, f'best_model_{run_name}.ckpt')
+                            save_model_path = os.path.join(model_export_dir, f'best_{run_name}.ckpt')
                         else:
                             save_model_path = None
                         if use_hydrology:
@@ -133,7 +141,8 @@ def main(experiment_type, iterations, n_folds, verbose=False):
                             test_model=test_model,
                             use_context=use_hydrology,
                             context_labels=data_loader.context_labels,
-                            save_model_path=save_model_path
+                            save_model_path=save_model_path,
+                            export_labels=export_labels
                         )
                         output_df = output_df.append(pd.Series(
                                 [iteration_n, fold_n, n_folds, percent_positive_validation, test_model, use_hydrology, pos_weight] + \
