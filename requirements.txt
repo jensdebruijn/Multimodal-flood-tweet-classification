@@ -13,5 +13,5 @@ tensorflow-gpu==1.15.4
 pytorch==1.0.1
 dask==2.3.0
 matplotlib==3.1.1
-openpyxl==1.0.1
+openpyxl==2.4.2
 xlrd==1.2.0
